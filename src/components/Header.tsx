@@ -1,11 +1,20 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Search, PlusCircle, Menu, X } from 'lucide-react';
+import { Home, Search, PlusCircle, Menu, X, User, LogOut, LayoutDashboard } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/hooks/useAuth';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
+  const { user, signOut } = useAuth();
 
   const navLinks = [
     { to: '/', label: 'Home', icon: Home },
@@ -47,13 +56,44 @@ const Header = () => {
             ))}
           </nav>
 
-          {/* CTA Button */}
+          {/* CTA Button & Auth */}
           <div className="hidden md:flex items-center gap-3">
-            <Link to="/list-property">
-              <Button className="bg-accent hover:bg-accent/90 text-accent-foreground font-semibold">
-                List Your Property
-              </Button>
-            </Link>
+            {user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <User className="h-4 w-4 mr-2" />
+                    Account
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem asChild>
+                    <Link to="/dashboard" className="flex items-center cursor-pointer">
+                      <LayoutDashboard className="h-4 w-4 mr-2" />
+                      Dashboard
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={signOut} className="cursor-pointer">
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <>
+                <Link to="/auth">
+                  <Button variant="ghost" size="sm">
+                    Login
+                  </Button>
+                </Link>
+                <Link to="/list-property">
+                  <Button className="bg-accent hover:bg-accent/90 text-accent-foreground font-semibold">
+                    List Your Property
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -92,12 +132,42 @@ const Header = () => {
                   </Link>
                 );
               })}
+              
               <div className="pt-2 mt-2 border-t border-border">
-                <Link to="/list-property" onClick={() => setIsMenuOpen(false)}>
-                  <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold">
-                    List Your Property
-                  </Button>
-                </Link>
+                {user ? (
+                  <>
+                    <Link to="/dashboard" onClick={() => setIsMenuOpen(false)}>
+                      <Button variant="ghost" className="w-full justify-start mb-2">
+                        <LayoutDashboard className="h-4 w-4 mr-2" />
+                        Dashboard
+                      </Button>
+                    </Link>
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start text-destructive"
+                      onClick={() => {
+                        signOut();
+                        setIsMenuOpen(false);
+                      }}
+                    >
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Sign Out
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Link to="/auth" onClick={() => setIsMenuOpen(false)}>
+                      <Button variant="ghost" className="w-full mb-2">
+                        Login
+                      </Button>
+                    </Link>
+                    <Link to="/list-property" onClick={() => setIsMenuOpen(false)}>
+                      <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold">
+                        List Your Property
+                      </Button>
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
           </nav>

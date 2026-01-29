@@ -1,21 +1,53 @@
-import { useState } from 'react';
-import { User, Phone, MapPin, DollarSign, Upload, CheckCircle, Camera } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { User, Phone, MapPin, DollarSign, Upload, CheckCircle, Camera, BedDouble, Bath } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import { locations } from '@/data/mockListings';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 
 const PropertyForm = () => {
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
     location: '',
     price: '',
     description: '',
-    propertyType: 'apartment'
+    propertyType: 'apartment',
+    title: '',
+    bedrooms: '1',
+    bathrooms: '1',
+    features: ''
   });
   const [photos, setPhotos] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+
+  // Pre-fill phone from profile if user is logged in
+  useEffect(() => {
+    if (user) {
+      const fetchProfile = async () => {
+        const { data } = await supabase
+          .from('profiles')
+          .select('full_name, phone')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        
+        if (data) {
+          setFormData(prev => ({
+            ...prev,
+            name: data.full_name || '',
+            phone: data.phone || ''
+          }));
+        }
+      };
+      fetchProfile();
+    }
+  }, [user]);
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -31,7 +63,7 @@ const PropertyForm = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name.trim() || !formData.phone.trim() || !formData.location || !formData.price) {
+    if (!formData.phone.trim() || !formData.location || !formData.price) {
       toast({
         title: "Please fill in all required fields",
         variant: "destructive"
@@ -41,7 +73,49 @@ const PropertyForm = () => {
 
     setIsSubmitting(true);
 
-    // Create WhatsApp message
+    // If user is logged in, save to database
+    if (user) {
+      const title = formData.title.trim() || `${formData.propertyType.charAt(0).toUpperCase() + formData.propertyType.slice(1)} in ${formData.location}`;
+      const featuresArray = formData.features
+        ? formData.features.split(',').map(f => f.trim()).filter(Boolean)
+        : [];
+
+      const { error } = await supabase.from('properties').insert({
+        user_id: user.id,
+        title,
+        type: formData.propertyType,
+        price: parseInt(formData.price),
+        location: formData.location,
+        bedrooms: parseInt(formData.bedrooms),
+        bathrooms: parseInt(formData.bathrooms),
+        description: formData.description,
+        features: featuresArray,
+        landlord_phone: formData.phone,
+        available: true
+      });
+
+      setIsSubmitting(false);
+
+      if (error) {
+        console.error('Error creating property:', error);
+        toast({
+          title: "Failed to list property",
+          description: "Please try again.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      toast({
+        title: "Property Listed!",
+        description: "Your property is now live on Entebbe Rentals."
+      });
+      
+      navigate('/dashboard');
+      return;
+    }
+
+    // If not logged in, send via WhatsApp (legacy flow)
     const message = encodeURIComponent(
       `New Property Listing Request:\n\n` +
       `📋 Type: ${formData.propertyType}\n` +
@@ -79,29 +153,54 @@ const PropertyForm = () => {
         <p className="text-muted-foreground mb-6 max-w-md mx-auto">
           Thank you for listing with us. We'll review your property and contact you within 24 hours to complete the listing.
         </p>
-        <Button
-          variant="outline"
-          onClick={() => {
-            setIsSubmitted(false);
-            setFormData({
-              name: '',
-              phone: '',
-              location: '',
-              price: '',
-              description: '',
-              propertyType: 'apartment'
-            });
-            setPhotos([]);
-          }}
-        >
-          List Another Property
-        </Button>
+        <div className="flex gap-3 justify-center">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setIsSubmitted(false);
+              setFormData({
+                name: '',
+                phone: '',
+                location: '',
+                price: '',
+                description: '',
+                propertyType: 'apartment',
+                title: '',
+                bedrooms: '1',
+                bathrooms: '1',
+                features: ''
+              });
+              setPhotos([]);
+            }}
+          >
+            List Another Property
+          </Button>
+          <Button onClick={() => navigate('/auth')}>
+            Create Account to Manage Listings
+          </Button>
+        </div>
       </div>
     );
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Login prompt for guests */}
+      {!user && !authLoading && (
+        <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl">
+          <p className="text-sm text-muted-foreground">
+            <button 
+              type="button" 
+              onClick={() => navigate('/auth')}
+              className="text-primary font-semibold hover:underline"
+            >
+              Login or create an account
+            </button>
+            {' '}to manage your listings and track enquiries.
+          </p>
+        </div>
+      )}
+
       {/* Property Type */}
       <div>
         <label className="form-label">Property Type *</label>
@@ -123,22 +222,40 @@ const PropertyForm = () => {
         </div>
       </div>
 
-      {/* Name */}
-      <div>
-        <label htmlFor="landlord-name" className="form-label">Your Name *</label>
-        <div className="relative">
-          <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+      {/* Title (for logged-in users) */}
+      {user && (
+        <div>
+          <label htmlFor="property-title" className="form-label">Property Title</label>
           <input
-            id="landlord-name"
+            id="property-title"
             type="text"
-            placeholder="Enter your full name"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            className="form-input pl-12"
-            required
+            placeholder="e.g., Modern 2-Bedroom Apartment Near Airport"
+            value={formData.title}
+            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+            className="form-input"
           />
+          <p className="text-xs text-muted-foreground mt-1">Leave blank to auto-generate</p>
         </div>
-      </div>
+      )}
+
+      {/* Name (only for guests) */}
+      {!user && (
+        <div>
+          <label htmlFor="landlord-name" className="form-label">Your Name *</label>
+          <div className="relative">
+            <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+            <input
+              id="landlord-name"
+              type="text"
+              placeholder="Enter your full name"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="form-input pl-12"
+              required
+            />
+          </div>
+        </div>
+      )}
 
       {/* Phone */}
       <div>
@@ -194,18 +311,71 @@ const PropertyForm = () => {
         </div>
       </div>
 
+      {/* Bedrooms & Bathrooms (for logged-in users) */}
+      {user && (
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="bedrooms" className="form-label">Bedrooms</label>
+            <div className="relative">
+              <BedDouble className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+              <select
+                id="bedrooms"
+                value={formData.bedrooms}
+                onChange={(e) => setFormData({ ...formData, bedrooms: e.target.value })}
+                className="form-input pl-12 appearance-none cursor-pointer"
+              >
+                {[1, 2, 3, 4, 5, 6].map(n => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label htmlFor="bathrooms" className="form-label">Bathrooms</label>
+            <div className="relative">
+              <Bath className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+              <select
+                id="bathrooms"
+                value={formData.bathrooms}
+                onChange={(e) => setFormData({ ...formData, bathrooms: e.target.value })}
+                className="form-input pl-12 appearance-none cursor-pointer"
+              >
+                {[1, 2, 3, 4].map(n => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Description */}
       <div>
-        <label htmlFor="property-description" className="form-label">Description (Optional)</label>
+        <label htmlFor="property-description" className="form-label">Description</label>
         <textarea
           id="property-description"
-          placeholder="Describe your property (bedrooms, bathrooms, features...)"
+          placeholder="Describe your property (features, nearby amenities...)"
           value={formData.description}
           onChange={(e) => setFormData({ ...formData, description: e.target.value })}
           className="form-input min-h-[120px] resize-y"
           rows={4}
         />
       </div>
+
+      {/* Features (for logged-in users) */}
+      {user && (
+        <div>
+          <label htmlFor="features" className="form-label">Features (comma separated)</label>
+          <input
+            id="features"
+            type="text"
+            placeholder="e.g., Furnished, Water Tank, 24/7 Security, Parking"
+            value={formData.features}
+            onChange={(e) => setFormData({ ...formData, features: e.target.value })}
+            className="form-input"
+          />
+        </div>
+      )}
 
       {/* Photos */}
       <div>
@@ -259,7 +429,7 @@ const PropertyForm = () => {
         ) : (
           <>
             <Upload className="w-5 h-5 mr-2" />
-            List My Property
+            {user ? 'Publish Listing' : 'List My Property'}
           </>
         )}
       </Button>
