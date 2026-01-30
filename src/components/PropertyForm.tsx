@@ -60,6 +60,34 @@ const PropertyForm = () => {
     setPhotos(photos.filter((_, i) => i !== index));
   };
 
+  const uploadImages = async (userId: string): Promise<string[]> => {
+    if (photos.length === 0) return [];
+
+    const uploadedUrls: string[] = [];
+    
+    for (const photo of photos) {
+      const fileExt = photo.name.split('.').pop();
+      const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('property-images')
+        .upload(fileName, photo);
+
+      if (uploadError) {
+        console.error('Error uploading image:', uploadError);
+        continue;
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('property-images')
+        .getPublicUrl(fileName);
+
+      uploadedUrls.push(publicUrl);
+    }
+
+    return uploadedUrls;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -80,6 +108,9 @@ const PropertyForm = () => {
         ? formData.features.split(',').map(f => f.trim()).filter(Boolean)
         : [];
 
+      // Upload images to storage
+      const imageUrls = await uploadImages(user.id);
+
       const { error } = await supabase.from('properties').insert({
         user_id: user.id,
         title,
@@ -91,6 +122,7 @@ const PropertyForm = () => {
         description: formData.description,
         features: featuresArray,
         landlord_phone: formData.phone,
+        images: imageUrls,
         available: true
       });
 
