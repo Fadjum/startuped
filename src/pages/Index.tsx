@@ -1,15 +1,55 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Home, Users, Shield, MapPin, Star, ArrowRight, CheckCircle } from 'lucide-react';
+import { Search, Home, Users, Shield, MapPin, Star, ArrowRight, CheckCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import SearchBar from '@/components/SearchBar';
 import PropertyCard from '@/components/PropertyCard';
-import { mockListings } from '@/data/mockListings';
+import { supabase } from '@/integrations/supabase/client';
+import { Property, mockListings } from '@/data/mockListings';
 import heroImage from '@/assets/hero-entebbe.jpg';
 
 const Index = () => {
-  const featuredListings = mockListings.slice(0, 3);
+  const [featuredListings, setFeaturedListings] = useState<Property[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchFeaturedListings = async () => {
+      const { data, error } = await supabase
+        .from('properties')
+        .select('*')
+        .eq('available', true)
+        .order('created_at', { ascending: false })
+        .limit(3);
+
+      if (error) {
+        console.error('Error fetching properties:', error);
+        setFeaturedListings(mockListings.slice(0, 3));
+      } else if (data && data.length > 0) {
+        const mapped: Property[] = data.map(p => ({
+          id: p.id,
+          title: p.title,
+          type: p.type as 'room' | 'apartment' | 'house',
+          price: p.price,
+          location: p.location,
+          bedrooms: p.bedrooms,
+          bathrooms: p.bathrooms,
+          description: p.description || '',
+          features: p.features || [],
+          images: p.images && p.images.length > 0 ? p.images : ['https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800'],
+          available: p.available ?? true,
+          landlordPhone: p.landlord_phone
+        }));
+        setFeaturedListings(mapped);
+      } else {
+        setFeaturedListings(mockListings.slice(0, 3));
+      }
+      setIsLoading(false);
+    };
+
+    fetchFeaturedListings();
+  }, []);
 
   return (
     <>
@@ -98,11 +138,17 @@ const Index = () => {
               </Link>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-              {featuredListings.map((listing) => (
-                <PropertyCard key={listing.id} property={listing} />
-              ))}
-            </div>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+                {featuredListings.map((listing) => (
+                  <PropertyCard key={listing.id} property={listing} />
+                ))}
+              </div>
+            )}
           </div>
         </section>
 
