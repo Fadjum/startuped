@@ -1,23 +1,65 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Filter, Grid, List } from 'lucide-react';
+import { Filter, Grid, List, Loader2 } from 'lucide-react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import SearchBar from '@/components/SearchBar';
 import PropertyCard from '@/components/PropertyCard';
-import { mockListings, Property } from '@/data/mockListings';
+import { supabase } from '@/integrations/supabase/client';
+import { Property, mockListings } from '@/data/mockListings';
 import { Button } from '@/components/ui/button';
 
 const Listings = () => {
   const [searchParams] = useSearchParams();
-  const [filteredListings, setFilteredListings] = useState<Property[]>(mockListings);
+  const [listings, setListings] = useState<Property[]>([]);
+  const [filteredListings, setFilteredListings] = useState<Property[]>([]);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchListings = async () => {
+      const { data, error } = await supabase
+        .from('properties')
+        .select('*')
+        .eq('available', true)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching properties:', error);
+        setListings(mockListings);
+        setFilteredListings(mockListings);
+      } else if (data && data.length > 0) {
+        const mapped: Property[] = data.map(p => ({
+          id: p.id,
+          title: p.title,
+          type: p.type as 'room' | 'apartment' | 'house',
+          price: p.price,
+          location: p.location,
+          bedrooms: p.bedrooms,
+          bathrooms: p.bathrooms,
+          description: p.description || '',
+          features: p.features || [],
+          images: p.images && p.images.length > 0 ? p.images : ['https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800'],
+          available: p.available ?? true,
+          landlordPhone: p.landlord_phone
+        }));
+        setListings(mapped);
+        setFilteredListings(mapped);
+      } else {
+        setListings(mockListings);
+        setFilteredListings(mockListings);
+      }
+      setIsLoading(false);
+    };
+
+    fetchListings();
+  }, []);
 
   useEffect(() => {
     const locationParam = searchParams.get('location');
     const typeParam = searchParams.get('type');
 
-    let results = [...mockListings];
+    let results = [...listings];
 
     if (locationParam && locationParam !== 'All Locations') {
       results = results.filter(p => 
@@ -30,10 +72,10 @@ const Listings = () => {
     }
 
     setFilteredListings(results);
-  }, [searchParams]);
+  }, [searchParams, listings]);
 
   const handleSearch = (location: string, type: string) => {
-    let results = [...mockListings];
+    let results = [...listings];
 
     if (location && location !== 'All Locations') {
       results = results.filter(p => 
@@ -98,7 +140,11 @@ const Listings = () => {
             </div>
 
             {/* Listings Grid */}
-            {filteredListings.length > 0 ? (
+            {isLoading ? (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : filteredListings.length > 0 ? (
               <div className={`grid gap-6 md:gap-8 ${
                 viewMode === 'grid' 
                   ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' 

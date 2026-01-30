@@ -140,7 +140,7 @@ const PropertyForm = () => {
 
       toast({
         title: "Property Listed!",
-        description: "Your property is now live on Entebbe Rentals."
+        description: "Your property is now live on UrbanNest."
       });
       
       navigate('/dashboard');

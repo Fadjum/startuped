@@ -26,7 +26,7 @@ const ListProperty = () => {
                 List Your Property
               </h1>
               <p className="text-lg text-primary-foreground/80">
-                Get serious tenants looking to rent in Entebbe. Airport staff, professionals, 
+                Get serious tenants looking to rent through UrbanNest. Airport staff, professionals, 
                 and families are actively searching for homes like yours.
               </p>
             </div>

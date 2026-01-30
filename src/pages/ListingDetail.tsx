@@ -1,16 +1,113 @@
+import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, MapPin, Bed, Bath, CheckCircle, Phone, MessageCircle } from 'lucide-react';
+import { ArrowLeft, MapPin, Bed, Bath, CheckCircle, Phone, MessageCircle, Loader2 } from 'lucide-react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import EnquiryForm from '@/components/EnquiryForm';
 import PropertyCard from '@/components/PropertyCard';
-import { mockListings, formatPrice } from '@/data/mockListings';
+import { supabase } from '@/integrations/supabase/client';
+import { Property, formatPrice, mockListings } from '@/data/mockListings';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
 const ListingDetail = () => {
   const { id } = useParams<{ id: string }>();
-  const property = mockListings.find(p => p.id === id);
+  const [property, setProperty] = useState<Property | null>(null);
+  const [similarListings, setSimilarListings] = useState<Property[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchProperty = async () => {
+      if (!id) return;
+
+      // Try to fetch from database first
+      const { data, error } = await supabase
+        .from('properties')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error fetching property:', error);
+      }
+
+      if (data) {
+        const mapped: Property = {
+          id: data.id,
+          title: data.title,
+          type: data.type as 'room' | 'apartment' | 'house',
+          price: data.price,
+          location: data.location,
+          bedrooms: data.bedrooms,
+          bathrooms: data.bathrooms,
+          description: data.description || '',
+          features: data.features || [],
+          images: data.images && data.images.length > 0 ? data.images : ['https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800'],
+          available: data.available ?? true,
+          landlordPhone: data.landlord_phone
+        };
+        setProperty(mapped);
+
+        // Fetch similar listings
+        const { data: similarData } = await supabase
+          .from('properties')
+          .select('*')
+          .eq('available', true)
+          .eq('type', data.type)
+          .neq('id', id)
+          .limit(3);
+
+        if (similarData && similarData.length > 0) {
+          const mappedSimilar: Property[] = similarData.map(p => ({
+            id: p.id,
+            title: p.title,
+            type: p.type as 'room' | 'apartment' | 'house',
+            price: p.price,
+            location: p.location,
+            bedrooms: p.bedrooms,
+            bathrooms: p.bathrooms,
+            description: p.description || '',
+            features: p.features || [],
+            images: p.images && p.images.length > 0 ? p.images : ['https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800'],
+            available: p.available ?? true,
+            landlordPhone: p.landlord_phone
+          }));
+          setSimilarListings(mappedSimilar);
+        }
+      } else {
+        // Fallback to mock data
+        const mockProperty = mockListings.find(p => p.id === id);
+        if (mockProperty) {
+          setProperty(mockProperty);
+          setSimilarListings(
+            mockListings.filter(p => p.id !== id && p.type === mockProperty.type).slice(0, 3)
+          );
+        }
+      }
+
+      setIsLoading(false);
+    };
+
+    fetchProperty();
+  }, [id]);
+
+  const typeLabels: Record<string, string> = {
+    room: 'Room',
+    apartment: 'Apartment',
+    house: 'House'
+  };
+
+  if (isLoading) {
+    return (
+      <>
+        <Header />
+        <main className="min-h-screen flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </main>
+        <Footer />
+      </>
+    );
+  }
 
   if (!property) {
     return (
@@ -31,16 +128,6 @@ const ListingDetail = () => {
       </>
     );
   }
-
-  const similarListings = mockListings
-    .filter(p => p.id !== property.id && p.type === property.type)
-    .slice(0, 3);
-
-  const typeLabels = {
-    room: 'Room',
-    apartment: 'Apartment',
-    house: 'House'
-  };
 
   return (
     <>
@@ -64,23 +151,40 @@ const ListingDetail = () => {
           <div className="grid lg:grid-cols-3 gap-8 md:gap-12">
             {/* Main Content */}
             <div className="lg:col-span-2 space-y-8">
-              {/* Image */}
-              <div className="relative aspect-[16/10] rounded-2xl overflow-hidden">
-                <img
-                  src={property.images[0]}
-                  alt={property.title}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute top-4 left-4 flex gap-2">
-                  <Badge variant="secondary" className="bg-card/90 backdrop-blur-sm">
-                    {typeLabels[property.type]}
-                  </Badge>
-                  {property.available && (
-                    <Badge className="bg-success text-success-foreground">
-                      Available Now
+              {/* Image Gallery */}
+              <div className="space-y-4">
+                <div className="relative aspect-[16/10] rounded-2xl overflow-hidden">
+                  <img
+                    src={property.images[0]}
+                    alt={property.title}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute top-4 left-4 flex gap-2">
+                    <Badge variant="secondary" className="bg-card/90 backdrop-blur-sm">
+                      {typeLabels[property.type]}
                     </Badge>
-                  )}
+                    {property.available && (
+                      <Badge className="bg-success text-success-foreground">
+                        Available Now
+                      </Badge>
+                    )}
+                  </div>
                 </div>
+                
+                {/* Additional Images */}
+                {property.images.length > 1 && (
+                  <div className="grid grid-cols-4 gap-2">
+                    {property.images.slice(1, 5).map((image, index) => (
+                      <div key={index} className="aspect-square rounded-lg overflow-hidden">
+                        <img
+                          src={image}
+                          alt={`${property.title} - Image ${index + 2}`}
+                          className="w-full h-full object-cover hover:scale-105 transition-transform"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Property Info */}
@@ -117,25 +221,27 @@ const ListingDetail = () => {
                 <div className="mb-8">
                   <h2 className="text-xl font-semibold text-foreground mb-4">Description</h2>
                   <p className="text-muted-foreground leading-relaxed">
-                    {property.description}
+                    {property.description || 'No description available.'}
                   </p>
                 </div>
 
                 {/* Features */}
-                <div>
-                  <h2 className="text-xl font-semibold text-foreground mb-4">Features</h2>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {property.features.map((feature, index) => (
-                      <div 
-                        key={index}
-                        className="flex items-center gap-2 text-foreground"
-                      >
-                        <CheckCircle className="w-5 h-5 text-success flex-shrink-0" />
-                        <span className="text-sm">{feature}</span>
-                      </div>
-                    ))}
+                {property.features && property.features.length > 0 && (
+                  <div>
+                    <h2 className="text-xl font-semibold text-foreground mb-4">Features</h2>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {property.features.map((feature, index) => (
+                        <div 
+                          key={index}
+                          className="flex items-center gap-2 text-foreground"
+                        >
+                          <CheckCircle className="w-5 h-5 text-success flex-shrink-0" />
+                          <span className="text-sm">{feature}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Mobile Quick Contact */}

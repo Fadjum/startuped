@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
-import { Home, Phone, Mail, MapPin, MessageCircle } from 'lucide-react';
+import { Phone, MapPin, MessageCircle } from 'lucide-react';
+import logo from '@/assets/logo.png';
 
 const Footer = () => {
   return (
@@ -9,13 +10,10 @@ const Footer = () => {
           {/* Brand */}
           <div className="lg:col-span-1">
             <Link to="/" className="flex items-center gap-2 mb-4">
-              <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
-                <Home className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <div>
-                <span className="font-bold text-lg text-background">Entebbe</span>
-                <span className="font-bold text-lg text-primary">Rentals</span>
-              </div>
+              <img src={logo} alt="UrbanNest" className="h-10 w-10 rounded-lg object-cover" />
+              <span className="font-bold text-lg text-background">
+                Urban<span className="text-primary">Nest</span>
+              </span>
             </Link>
             <p className="text-background/70 text-sm leading-relaxed">
               Connecting tenants and landlords in Entebbe, Uganda. Find your perfect rental home near Lake Victoria.
@@ -93,7 +91,7 @@ const Footer = () => {
         <div className="mt-12 pt-8 border-t border-background/10">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-background/50 text-sm">
-              © {new Date().getFullYear()} Entebbe Rentals. All rights reserved.
+              © {new Date().getFullYear()} UrbanNest. All rights reserved.
             </p>
             <p className="text-background/50 text-xs">
               We connect you to landlords. Availability may vary.

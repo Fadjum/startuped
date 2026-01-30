@@ -1,8 +1,9 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Search, PlusCircle, Menu, X, User, LogOut, LayoutDashboard } from 'lucide-react';
+import { Search, PlusCircle, Menu, X, User, LogOut, LayoutDashboard } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
+import logo from '@/assets/logo.png';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,7 +18,7 @@ const Header = () => {
   const { user, signOut } = useAuth();
 
   const navLinks = [
-    { to: '/', label: 'Home', icon: Home },
+    { to: '/', label: 'Home', icon: null },
     { to: '/listings', label: 'Find Rentals', icon: Search },
     { to: '/list-property', label: 'List Property', icon: PlusCircle },
   ];
@@ -30,13 +31,10 @@ const Header = () => {
         <div className="flex items-center justify-between h-16 md:h-20">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
-              <Home className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <div className="hidden sm:block">
-              <span className="font-bold text-lg text-foreground">Entebbe</span>
-              <span className="font-bold text-lg text-primary">Rentals</span>
-            </div>
+            <img src={logo} alt="UrbanNest" className="h-10 w-10 rounded-lg object-cover" />
+            <span className="hidden sm:block font-bold text-xl text-foreground">
+              Urban<span className="text-primary">Nest</span>
+            </span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -127,7 +125,7 @@ const Header = () => {
                         : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                     }`}
                   >
-                    <Icon className="w-5 h-5" />
+                    {Icon && <Icon className="w-5 h-5" />}
                     {link.label}
                   </Link>
                 );

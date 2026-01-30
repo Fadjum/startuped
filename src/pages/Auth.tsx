@@ -7,8 +7,9 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Home, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { z } from 'zod';
+import logo from '@/assets/logo.png';
 
 const emailSchema = z.string().email('Please enter a valid email address');
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
@@ -104,7 +105,7 @@ export default function Auth() {
     } else {
       toast({
         title: 'Account Created!',
-        description: 'Welcome to Entebbe Rentals. You can now list your properties.'
+        description: 'Welcome to UrbanNest. You can now list your properties.'
       });
       navigate('/dashboard');
     }
@@ -114,9 +115,9 @@ export default function Auth() {
     <div className="min-h-screen bg-muted/30 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <a href="/" className="inline-flex items-center gap-2 text-2xl font-bold text-primary">
-            <Home className="h-8 w-8" />
-            Entebbe Rentals
+          <a href="/" className="inline-flex items-center gap-2 text-2xl font-bold">
+            <img src={logo} alt="UrbanNest" className="h-10 w-10 rounded-lg object-cover" />
+            <span className="text-foreground">Urban<span className="text-primary">Nest</span></span>
           </a>
           <p className="text-muted-foreground mt-2">Landlord Portal</p>
         </div>

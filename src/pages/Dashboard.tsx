@@ -248,7 +248,7 @@ export default function Dashboard() {
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          const message = `Hello! I saw your enquiry on Entebbe Rentals.`;
+                        const message = `Hello! I saw your enquiry on UrbanNest.`;
                           window.open(`https://wa.me/${enquiry.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(message)}`, '_blank');
                         }}
                       >
