@@ -5,7 +5,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import SearchBar from '@/components/SearchBar';
 import PropertyCard from '@/components/PropertyCard';
-import { supabase } from '@/integrations/supabase/client';
+import { api, ApiProperty } from '@/lib/api';
 import { Property, mockListings } from '@/data/mockListings';
 import { Button } from '@/components/ui/button';
 
@@ -18,34 +18,31 @@ const Listings = () => {
 
   useEffect(() => {
     const fetchListings = async () => {
-      const { data, error } = await supabase
-        .from('properties')
-        .select('*')
-        .eq('available', true)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        // Fallback to mock data on error
-        setListings(mockListings);
-        setFilteredListings(mockListings);
-      } else if (data && data.length > 0) {
-        const mapped: Property[] = data.map(p => ({
-          id: p.id,
-          title: p.title,
-          type: p.type as 'room' | 'apartment' | 'house',
-          price: p.price,
-          location: p.location,
-          bedrooms: p.bedrooms,
-          bathrooms: p.bathrooms,
-          description: p.description || '',
-          features: p.features || [],
-          images: p.images && p.images.length > 0 ? p.images : ['https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800'],
-          available: p.available ?? true,
-          landlordPhone: p.landlord_phone
-        }));
-        setListings(mapped);
-        setFilteredListings(mapped);
-      } else {
+      try {
+        const data = await api.properties.list(true);
+        
+        if (data && data.length > 0) {
+          const mapped: Property[] = data.map(p => ({
+            id: p.id,
+            title: p.title,
+            type: p.type as 'room' | 'apartment' | 'house',
+            price: p.price,
+            location: p.location,
+            bedrooms: p.bedrooms,
+            bathrooms: p.bathrooms,
+            description: p.description || '',
+            features: p.features || [],
+            images: p.images && p.images.length > 0 ? p.images : ['https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800'],
+            available: p.available ?? true,
+            landlordPhone: p.landlordPhone
+          }));
+          setListings(mapped);
+          setFilteredListings(mapped);
+        } else {
+          setListings(mockListings);
+          setFilteredListings(mockListings);
+        }
+      } catch (error) {
         setListings(mockListings);
         setFilteredListings(mockListings);
       }
@@ -95,7 +92,6 @@ const Listings = () => {
       <Header />
       
       <main className="min-h-screen">
-        {/* Page Header */}
         <section className="bg-muted/50 py-8 md:py-12">
           <div className="container-custom">
             <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2">
@@ -109,11 +105,9 @@ const Listings = () => {
           </div>
         </section>
 
-        {/* Results */}
         <section className="py-8 md:py-12">
           <div className="container-custom">
-            {/* Results Header */}
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between mb-6 gap-2 flex-wrap">
               <p className="text-muted-foreground">
                 <span className="font-semibold text-foreground">{filteredListings.length}</span>
                 {' '}properties found
@@ -139,7 +133,6 @@ const Listings = () => {
               </div>
             </div>
 
-            {/* Listings Grid */}
             {isLoading ? (
               <div className="flex items-center justify-center py-16">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />

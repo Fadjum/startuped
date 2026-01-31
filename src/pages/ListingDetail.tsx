@@ -5,7 +5,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import EnquiryForm from '@/components/EnquiryForm';
 import PropertyCard from '@/components/PropertyCard';
-import { supabase } from '@/integrations/supabase/client';
+import { api, ApiProperty } from '@/lib/api';
 import { Property, formatPrice, mockListings } from '@/data/mockListings';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,60 +20,58 @@ const ListingDetail = () => {
     const fetchProperty = async () => {
       if (!id) return;
 
-      // Try to fetch from database first
-      const { data, error } = await supabase
-        .from('properties')
-        .select('*')
-        .eq('id', id)
-        .maybeSingle();
+      try {
+        const data = await api.properties.get(id);
 
-      // Error handled by fallback to mock data below
+        if (data) {
+          const mapped: Property = {
+            id: data.id,
+            title: data.title,
+            type: data.type as 'room' | 'apartment' | 'house',
+            price: data.price,
+            location: data.location,
+            bedrooms: data.bedrooms,
+            bathrooms: data.bathrooms,
+            description: data.description || '',
+            features: data.features || [],
+            images: data.images && data.images.length > 0 ? data.images : ['https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800'],
+            available: data.available ?? true,
+            landlordPhone: data.landlordPhone
+          };
+          setProperty(mapped);
 
-      if (data) {
-        const mapped: Property = {
-          id: data.id,
-          title: data.title,
-          type: data.type as 'room' | 'apartment' | 'house',
-          price: data.price,
-          location: data.location,
-          bedrooms: data.bedrooms,
-          bathrooms: data.bathrooms,
-          description: data.description || '',
-          features: data.features || [],
-          images: data.images && data.images.length > 0 ? data.images : ['https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800'],
-          available: data.available ?? true,
-          landlordPhone: data.landlord_phone
-        };
-        setProperty(mapped);
-
-        // Fetch similar listings
-        const { data: similarData } = await supabase
-          .from('properties')
-          .select('*')
-          .eq('available', true)
-          .eq('type', data.type)
-          .neq('id', id)
-          .limit(3);
-
-        if (similarData && similarData.length > 0) {
-          const mappedSimilar: Property[] = similarData.map(p => ({
-            id: p.id,
-            title: p.title,
-            type: p.type as 'room' | 'apartment' | 'house',
-            price: p.price,
-            location: p.location,
-            bedrooms: p.bedrooms,
-            bathrooms: p.bathrooms,
-            description: p.description || '',
-            features: p.features || [],
-            images: p.images && p.images.length > 0 ? p.images : ['https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800'],
-            available: p.available ?? true,
-            landlordPhone: p.landlord_phone
-          }));
-          setSimilarListings(mappedSimilar);
+          try {
+            const similarData = await api.properties.getSimilar(id);
+            if (similarData && similarData.length > 0) {
+              const mappedSimilar: Property[] = similarData.map(p => ({
+                id: p.id,
+                title: p.title,
+                type: p.type as 'room' | 'apartment' | 'house',
+                price: p.price,
+                location: p.location,
+                bedrooms: p.bedrooms,
+                bathrooms: p.bathrooms,
+                description: p.description || '',
+                features: p.features || [],
+                images: p.images && p.images.length > 0 ? p.images : ['https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800'],
+                available: p.available ?? true,
+                landlordPhone: p.landlordPhone
+              }));
+              setSimilarListings(mappedSimilar);
+            }
+          } catch {
+            // Ignore similar properties error
+          }
+        } else {
+          const mockProperty = mockListings.find(p => p.id === id);
+          if (mockProperty) {
+            setProperty(mockProperty);
+            setSimilarListings(
+              mockListings.filter(p => p.id !== id && p.type === mockProperty.type).slice(0, 3)
+            );
+          }
         }
-      } else {
-        // Fallback to mock data
+      } catch (error) {
         const mockProperty = mockListings.find(p => p.id === id);
         if (mockProperty) {
           setProperty(mockProperty);
@@ -132,7 +130,6 @@ const ListingDetail = () => {
       <Header />
       
       <main className="min-h-screen">
-        {/* Breadcrumb */}
         <div className="bg-muted/50 py-4">
           <div className="container-custom">
             <Link 
@@ -147,9 +144,7 @@ const ListingDetail = () => {
 
         <div className="container-custom py-8 md:py-12">
           <div className="grid lg:grid-cols-3 gap-8 md:gap-12">
-            {/* Main Content */}
             <div className="lg:col-span-2 space-y-8">
-              {/* Image Gallery */}
               <div className="space-y-4">
                 <div className="relative aspect-[16/10] rounded-2xl overflow-hidden">
                   <img
@@ -157,7 +152,7 @@ const ListingDetail = () => {
                     alt={property.title}
                     className="w-full h-full object-cover"
                   />
-                  <div className="absolute top-4 left-4 flex gap-2">
+                  <div className="absolute top-4 left-4 flex gap-2 flex-wrap">
                     <Badge variant="secondary" className="bg-card/90 backdrop-blur-sm">
                       {typeLabels[property.type]}
                     </Badge>
@@ -169,7 +164,6 @@ const ListingDetail = () => {
                   </div>
                 </div>
                 
-                {/* Additional Images */}
                 {property.images.length > 1 && (
                   <div className="grid grid-cols-4 gap-2">
                     {property.images.slice(1, 5).map((image, index) => (
@@ -185,7 +179,6 @@ const ListingDetail = () => {
                 )}
               </div>
 
-              {/* Property Info */}
               <div>
                 <div className="flex flex-wrap items-center gap-4 mb-4">
                   <span className="text-3xl md:text-4xl font-bold text-primary">
@@ -215,7 +208,6 @@ const ListingDetail = () => {
 
                 <hr className="border-border my-6" />
 
-                {/* Description */}
                 <div className="mb-8">
                   <h2 className="text-xl font-semibold text-foreground mb-4">Description</h2>
                   <p className="text-muted-foreground leading-relaxed">
@@ -223,7 +215,6 @@ const ListingDetail = () => {
                   </p>
                 </div>
 
-                {/* Features */}
                 {property.features && property.features.length > 0 && (
                   <div>
                     <h2 className="text-xl font-semibold text-foreground mb-4">Features</h2>
@@ -242,7 +233,6 @@ const ListingDetail = () => {
                 )}
               </div>
 
-              {/* Mobile Quick Contact */}
               <div className="lg:hidden bg-muted/50 rounded-xl p-4">
                 <p className="text-sm text-muted-foreground mb-3">Quick Contact</p>
                 <div className="flex gap-3">
@@ -267,7 +257,6 @@ const ListingDetail = () => {
               </div>
             </div>
 
-            {/* Sidebar - Enquiry Form */}
             <div className="lg:col-span-1">
               <div className="sticky top-24 bg-card rounded-2xl border border-border p-6 shadow-card">
                 <h3 className="font-semibold text-lg text-foreground mb-1">
@@ -281,7 +270,6 @@ const ListingDetail = () => {
             </div>
           </div>
 
-          {/* Similar Listings */}
           {similarListings.length > 0 && (
             <section className="mt-16">
               <h2 className="text-2xl font-bold text-foreground mb-6">
