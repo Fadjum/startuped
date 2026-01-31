@@ -49,10 +49,37 @@ const PropertyForm = () => {
     }
   }, [user]);
 
+  // Allowed image types and max size (5MB)
+  const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const newPhotos = Array.from(e.target.files);
-      setPhotos([...photos, ...newPhotos].slice(0, 5));
+      
+      // Validate each file
+      const validPhotos: File[] = [];
+      for (const photo of newPhotos) {
+        if (!ALLOWED_IMAGE_TYPES.includes(photo.type)) {
+          toast({
+            title: "Invalid file type",
+            description: `${photo.name} is not a valid image. Please use JPG, PNG, or WebP.`,
+            variant: "destructive"
+          });
+          continue;
+        }
+        if (photo.size > MAX_FILE_SIZE) {
+          toast({
+            title: "File too large",
+            description: `${photo.name} exceeds 5MB limit.`,
+            variant: "destructive"
+          });
+          continue;
+        }
+        validPhotos.push(photo);
+      }
+      
+      setPhotos([...photos, ...validPhotos].slice(0, 5));
     }
   };
 
@@ -74,7 +101,7 @@ const PropertyForm = () => {
         .upload(fileName, photo);
 
       if (uploadError) {
-        console.error('Error uploading image:', uploadError);
+        // Skip failed uploads, continue with others
         continue;
       }
 
@@ -129,10 +156,9 @@ const PropertyForm = () => {
       setIsSubmitting(false);
 
       if (error) {
-        console.error('Error creating property:', error);
         toast({
           title: "Failed to list property",
-          description: "Please try again.",
+          description: "Please check your details and try again.",
           variant: "destructive"
         });
         return;

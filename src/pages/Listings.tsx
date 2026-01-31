@@ -25,7 +25,7 @@ const Listings = () => {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Error fetching properties:', error);
+        // Fallback to mock data on error
         setListings(mockListings);
         setFilteredListings(mockListings);
       } else if (data && data.length > 0) {

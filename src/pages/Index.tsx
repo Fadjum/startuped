@@ -24,7 +24,7 @@ const Index = () => {
         .limit(3);
 
       if (error) {
-        console.error('Error fetching properties:', error);
+        // Fallback to mock data on error
         setFeaturedListings(mockListings.slice(0, 3));
       } else if (data && data.length > 0) {
         const mapped: Property[] = data.map(p => ({

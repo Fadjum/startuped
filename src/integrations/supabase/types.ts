@@ -138,7 +138,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      submit_enquiry: {
+        Args: {
+          p_message?: string
+          p_name: string
+          p_phone: string
+          p_property_id: string
+          p_whatsapp?: boolean
+        }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never

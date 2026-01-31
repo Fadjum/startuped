@@ -61,9 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         phone: phone
       });
 
-      if (profileError) {
-        console.error('Error creating profile:', profileError);
-      }
+      // Profile creation error is handled silently - user can still proceed
     }
 
     return { error: null };
