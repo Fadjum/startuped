@@ -94,7 +94,7 @@ export const mockListings: Property[] = [
     bathrooms: 1,
     description: 'Spacious double room suitable for a couple or individual seeking more space. Self-contained with a small kitchenette. Located in a friendly neighborhood.',
     features: ['Self-Contained', 'Kitchenette', 'Tiled Floors', 'Good Ventilation'],
-    images: ['https://images.unsplash.com/photo-1598928506311-c55ez9d6e6f?w=800'],
+    images: ['https://images.unsplash.com/photo-1598928506311-c55ece34a6e7?w=800'],
     available: true,
     landlordPhone: '+256769616091'
   }
