@@ -1,1 +1,4 @@
 project_id = "cqzpmmtmtdsjwmyxuycd"
+
+[functions.upload-property-image]
+verify_jwt = false

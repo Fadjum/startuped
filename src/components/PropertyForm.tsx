@@ -87,32 +87,62 @@ const PropertyForm = () => {
     setPhotos(photos.filter((_, i) => i !== index));
   };
 
-  const uploadImages = async (userId: string): Promise<string[]> => {
+  const uploadImages = async (): Promise<string[]> => {
     if (photos.length === 0) return [];
 
-    const uploadedUrls: string[] = [];
-    
-    for (const photo of photos) {
-      const fileExt = photo.name.split('.').pop();
-      const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('property-images')
-        .upload(fileName, photo);
-
-      if (uploadError) {
-        // Skip failed uploads, continue with others
-        continue;
-      }
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('property-images')
-        .getPublicUrl(fileName);
-
-      uploadedUrls.push(publicUrl);
+    // Get current session for auth token
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to upload images.",
+        variant: "destructive"
+      });
+      return [];
     }
 
-    return uploadedUrls;
+    // Prepare form data with all photos
+    const formData = new FormData();
+    for (const photo of photos) {
+      formData.append('files', photo);
+    }
+
+    try {
+      const response = await supabase.functions.invoke('upload-property-image', {
+        body: formData,
+      });
+
+      if (response.error) {
+        toast({
+          title: "Upload failed",
+          description: "Some images could not be uploaded. Please try again.",
+          variant: "destructive"
+        });
+        return [];
+      }
+
+      const data = response.data;
+      const uploadedUrls = data.results
+        .filter((r: { success: boolean }) => r.success)
+        .map((r: { url: string }) => r.url);
+
+      if (data.summary.failed > 0) {
+        toast({
+          title: "Some uploads failed",
+          description: `${data.summary.successful} of ${data.summary.total} images uploaded.`,
+          variant: "destructive"
+        });
+      }
+
+      return uploadedUrls;
+    } catch (error) {
+      toast({
+        title: "Upload error",
+        description: "Failed to upload images. Please try again.",
+        variant: "destructive"
+      });
+      return [];
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -136,7 +166,7 @@ const PropertyForm = () => {
         : [];
 
       // Upload images to storage
-      const imageUrls = await uploadImages(user.id);
+      const imageUrls = await uploadImages();
 
       const { error } = await supabase.from('properties').insert({
         user_id: user.id,
