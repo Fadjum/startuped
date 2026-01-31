@@ -4,10 +4,27 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Property } from '@/data/mockListings';
 import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface EnquiryFormProps {
   property: Property;
 }
+
+// Validation helpers
+const validateName = (name: string): string | null => {
+  const trimmed = name.trim();
+  if (trimmed.length < 2) return 'Name must be at least 2 characters';
+  if (trimmed.length > 100) return 'Name must be 100 characters or less';
+  return null;
+};
+
+const validatePhone = (phone: string): string | null => {
+  const trimmed = phone.trim();
+  if (trimmed.length < 10) return 'Phone number must be at least 10 characters';
+  if (trimmed.length > 20) return 'Phone number must be 20 characters or less';
+  if (!/^[0-9+\-\s()]+$/.test(trimmed)) return 'Phone number contains invalid characters';
+  return null;
+};
 
 const EnquiryForm = ({ property }: EnquiryFormProps) => {
   const [formData, setFormData] = useState({
@@ -21,16 +38,47 @@ const EnquiryForm = ({ property }: EnquiryFormProps) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name.trim() || !formData.phone.trim()) {
+    // Client-side validation
+    const nameError = validateName(formData.name);
+    if (nameError) {
       toast({
-        title: "Please fill in all fields",
-        description: "Name and phone number are required.",
+        title: "Invalid name",
+        description: nameError,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const phoneError = validatePhone(formData.phone);
+    if (phoneError) {
+      toast({
+        title: "Invalid phone number",
+        description: phoneError,
         variant: "destructive"
       });
       return;
     }
 
     setIsSubmitting(true);
+
+    // Submit enquiry to database using the validated function
+    const { error } = await supabase.rpc('submit_enquiry', {
+      p_property_id: property.id,
+      p_name: formData.name.trim(),
+      p_phone: formData.phone.trim(),
+      p_message: null,
+      p_whatsapp: formData.useWhatsApp
+    });
+
+    if (error) {
+      setIsSubmitting(false);
+      toast({
+        title: "Unable to submit enquiry",
+        description: "Please check your details and try again.",
+        variant: "destructive"
+      });
+      return;
+    }
 
     // Create message for WhatsApp
     const message = encodeURIComponent(
@@ -39,28 +87,25 @@ const EnquiryForm = ({ property }: EnquiryFormProps) => {
       `💰 UGX ${property.price.toLocaleString()}/month\n` +
       `📌 ${property.location}\n\n` +
       `My details:\n` +
-      `Name: ${formData.name}\n` +
-      `Phone: ${formData.phone}\n\n` +
+      `Name: ${formData.name.trim()}\n` +
+      `Phone: ${formData.phone.trim()}\n\n` +
       `Please contact me about this property.`
     );
 
     // Open WhatsApp with the message
     const whatsappUrl = `https://wa.me/256740166778?text=${message}`;
     
-    // Simulate form submission
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setIsSubmitted(true);
-      
-      if (formData.useWhatsApp) {
-        window.open(whatsappUrl, '_blank');
-      }
+    setIsSubmitting(false);
+    setIsSubmitted(true);
+    
+    if (formData.useWhatsApp) {
+      window.open(whatsappUrl, '_blank');
+    }
 
-      toast({
-        title: "Enquiry Sent!",
-        description: "The landlord will contact you soon.",
-      });
-    }, 1000);
+    toast({
+      title: "Enquiry Sent!",
+      description: "The landlord will contact you soon.",
+    });
   };
 
   if (isSubmitted) {

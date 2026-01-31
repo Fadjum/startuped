@@ -27,9 +27,7 @@ const ListingDetail = () => {
         .eq('id', id)
         .maybeSingle();
 
-      if (error) {
-        console.error('Error fetching property:', error);
-      }
+      // Error handled by fallback to mock data below
 
       if (data) {
         const mapped: Property = {

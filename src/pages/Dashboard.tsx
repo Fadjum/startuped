@@ -60,9 +60,7 @@ export default function Dashboard() {
       .eq('user_id', user?.id)
       .order('created_at', { ascending: false });
 
-    if (propertiesError) {
-      console.error('Error fetching properties:', propertiesError);
-    } else {
+    if (!propertiesError) {
       setProperties(propertiesData || []);
     }
 
@@ -72,9 +70,7 @@ export default function Dashboard() {
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (enquiriesError) {
-      console.error('Error fetching enquiries:', enquiriesError);
-    } else {
+    if (!enquiriesError) {
       setEnquiries(enquiriesData || []);
     }
 
