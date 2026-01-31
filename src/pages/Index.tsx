@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Home, Users, Shield, MapPin, Star, ArrowRight, CheckCircle, Loader2 } from 'lucide-react';
+import { Search, Home, Users, Shield, Star, ArrowRight, CheckCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
@@ -71,12 +71,6 @@ const Index = () => {
           {/* Content */}
           <div className="relative z-10 container-custom py-20 text-center">
             <div className="max-w-4xl mx-auto animate-fade-in">
-              {/* Badge */}
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/20 backdrop-blur-sm text-primary-foreground text-sm font-medium mb-6">
-                <MapPin className="w-4 h-4" />
-                Serving Entebbe & Surrounding Areas
-              </div>
-
               {/* Headline */}
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-primary-foreground mb-6 leading-tight">
                 Find Rental Houses & Rooms
