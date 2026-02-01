@@ -129,7 +129,8 @@ export function registerRoutes(app: Express): void {
 
   app.get("/api/properties/:id", async (req: Request, res: Response) => {
     try {
-      const property = await storage.getPropertyById(req.params.id);
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const property = await storage.getPropertyById(id);
       if (!property) {
         return res.status(404).json({ error: "Property not found" });
       }
@@ -142,7 +143,8 @@ export function registerRoutes(app: Express): void {
 
   app.get("/api/properties/:id/similar", async (req: Request, res: Response) => {
     try {
-      const property = await storage.getPropertyById(req.params.id);
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const property = await storage.getPropertyById(id);
       if (!property) {
         return res.status(404).json({ error: "Property not found" });
       }
@@ -197,7 +199,8 @@ export function registerRoutes(app: Express): void {
         return res.status(401).json({ error: "Not authenticated" });
       }
 
-      const success = await storage.deleteProperty(req.params.id, req.session.userId);
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const success = await storage.deleteProperty(id, req.session.userId);
       if (!success) {
         return res.status(404).json({ error: "Property not found or not authorized" });
       }

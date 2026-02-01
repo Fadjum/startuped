@@ -1,6 +1,5 @@
 import { pgTable, text, integer, boolean, timestamp, uuid } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod";
 
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -58,8 +57,8 @@ export const insertEnquirySchema = createInsertSchema(enquiries).omit({
 });
 
 export type User = typeof users.$inferSelect;
-export type InsertUser = z.infer<typeof insertUserSchema>;
+export type InsertUser = typeof users.$inferInsert;
 export type Property = typeof properties.$inferSelect;
-export type InsertProperty = z.infer<typeof insertPropertySchema>;
+export type InsertProperty = typeof properties.$inferInsert;
 export type Enquiry = typeof enquiries.$inferSelect;
-export type InsertEnquiry = z.infer<typeof insertEnquirySchema>;
+export type InsertEnquiry = typeof enquiries.$inferInsert;
