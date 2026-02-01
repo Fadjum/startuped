@@ -3,14 +3,13 @@ import { User, Phone, MessageCircle, Send, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Property } from '@/data/mockListings';
-import { toast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { api } from '@/lib/api';
 
 interface EnquiryFormProps {
   property: Property;
 }
 
-// Validation helpers
 const validateName = (name: string): string | null => {
   const trimmed = name.trim();
   if (trimmed.length < 2) return 'Name must be at least 2 characters';
@@ -34,11 +33,11 @@ const EnquiryForm = ({ property }: EnquiryFormProps) => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Client-side validation
     const nameError = validateName(formData.name);
     if (nameError) {
       toast({
@@ -61,51 +60,46 @@ const EnquiryForm = ({ property }: EnquiryFormProps) => {
 
     setIsSubmitting(true);
 
-    // Submit enquiry to database using the validated function
-    const { error } = await supabase.rpc('submit_enquiry', {
-      p_property_id: property.id,
-      p_name: formData.name.trim(),
-      p_phone: formData.phone.trim(),
-      p_message: null,
-      p_whatsapp: formData.useWhatsApp
-    });
+    try {
+      await api.enquiries.create({
+        propertyId: property.id,
+        name: formData.name.trim(),
+        phone: formData.phone.trim(),
+        whatsapp: formData.useWhatsApp
+      });
 
-    if (error) {
+      const message = encodeURIComponent(
+        `Hi, I'm interested in your property:\n\n` +
+        `📍 ${property.title}\n` +
+        `💰 UGX ${property.price.toLocaleString()}/month\n` +
+        `📌 ${property.location}\n\n` +
+        `My details:\n` +
+        `Name: ${formData.name.trim()}\n` +
+        `Phone: ${formData.phone.trim()}\n\n` +
+        `Please contact me about this property.`
+      );
+
+      const whatsappUrl = `https://wa.me/256740166778?text=${message}`;
+      
+      setIsSubmitting(false);
+      setIsSubmitted(true);
+      
+      if (formData.useWhatsApp) {
+        window.open(whatsappUrl, '_blank');
+      }
+
+      toast({
+        title: "Enquiry Sent!",
+        description: "The landlord will contact you soon.",
+      });
+    } catch (error) {
       setIsSubmitting(false);
       toast({
         title: "Unable to submit enquiry",
-        description: "Please check your details and try again.",
+        description: (error as Error).message,
         variant: "destructive"
       });
-      return;
     }
-
-    // Create message for WhatsApp
-    const message = encodeURIComponent(
-      `Hi, I'm interested in your property:\n\n` +
-      `📍 ${property.title}\n` +
-      `💰 UGX ${property.price.toLocaleString()}/month\n` +
-      `📌 ${property.location}\n\n` +
-      `My details:\n` +
-      `Name: ${formData.name.trim()}\n` +
-      `Phone: ${formData.phone.trim()}\n\n` +
-      `Please contact me about this property.`
-    );
-
-    // Open WhatsApp with the message
-    const whatsappUrl = `https://wa.me/256740166778?text=${message}`;
-    
-    setIsSubmitting(false);
-    setIsSubmitted(true);
-    
-    if (formData.useWhatsApp) {
-      window.open(whatsappUrl, '_blank');
-    }
-
-    toast({
-      title: "Enquiry Sent!",
-      description: "The landlord will contact you soon.",
-    });
   };
 
   if (isSubmitted) {
@@ -132,7 +126,7 @@ const EnquiryForm = ({ property }: EnquiryFormProps) => {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label htmlFor="name" className="form-label">
+        <label htmlFor="name" className="form-label font-medium block mb-2">
           Your Name
         </label>
         <div className="relative">
@@ -143,14 +137,14 @@ const EnquiryForm = ({ property }: EnquiryFormProps) => {
             placeholder="Enter your full name"
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            className="form-input pl-12"
+            className="form-input w-full pl-12 pr-4 py-2 border rounded-md"
             required
           />
         </div>
       </div>
 
       <div>
-        <label htmlFor="phone" className="form-label">
+        <label htmlFor="phone" className="form-label font-medium block mb-2">
           Phone Number
         </label>
         <div className="relative">
@@ -161,7 +155,7 @@ const EnquiryForm = ({ property }: EnquiryFormProps) => {
             placeholder="+256 700 000 000"
             value={formData.phone}
             onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-            className="form-input pl-12"
+            className="form-input w-full pl-12 pr-4 py-2 border rounded-md"
             required
           />
         </div>
@@ -182,11 +176,11 @@ const EnquiryForm = ({ property }: EnquiryFormProps) => {
       <Button
         type="submit"
         disabled={isSubmitting}
-        className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold py-6"
+        className="w-full bg-primary text-primary-foreground font-semibold py-6 rounded-md"
       >
         {isSubmitting ? (
           <>
-            <div className="w-5 h-5 border-2 border-accent-foreground/30 border-t-accent-foreground rounded-full animate-spin mr-2" />
+            <div className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin mr-2" />
             Sending...
           </>
         ) : (

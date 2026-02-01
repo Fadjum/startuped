@@ -6,7 +6,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import SearchBar from '@/components/SearchBar';
 import PropertyCard from '@/components/PropertyCard';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { Property, mockListings } from '@/data/mockListings';
 import heroImage from '@/assets/hero-entebbe.jpg';
 
@@ -16,33 +16,29 @@ const Index = () => {
 
   useEffect(() => {
     const fetchFeaturedListings = async () => {
-      const { data, error } = await supabase
-        .from('properties')
-        .select('*')
-        .eq('available', true)
-        .order('created_at', { ascending: false })
-        .limit(3);
-
-      if (error) {
-        // Fallback to mock data on error
-        setFeaturedListings(mockListings.slice(0, 3));
-      } else if (data && data.length > 0) {
-        const mapped: Property[] = data.map(p => ({
-          id: p.id,
-          title: p.title,
-          type: p.type as 'room' | 'apartment' | 'house',
-          price: p.price,
-          location: p.location,
-          bedrooms: p.bedrooms,
-          bathrooms: p.bathrooms,
-          description: p.description || '',
-          features: p.features || [],
-          images: p.images && p.images.length > 0 ? p.images : ['https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800'],
-          available: p.available ?? true,
-          landlordPhone: p.landlord_phone
-        }));
-        setFeaturedListings(mapped);
-      } else {
+      try {
+        const data = await api.properties.list(true);
+        
+        if (data && data.length > 0) {
+          const mapped: Property[] = data.slice(0, 3).map(p => ({
+            id: p.id,
+            title: p.title,
+            type: p.type as 'room' | 'apartment' | 'house',
+            price: p.price,
+            location: p.location,
+            bedrooms: p.bedrooms,
+            bathrooms: p.bathrooms,
+            description: p.description || '',
+            features: p.features || [],
+            images: p.images && p.images.length > 0 ? p.images : ['https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800'],
+            available: p.available ?? true,
+            landlordPhone: p.landlordPhone
+          }));
+          setFeaturedListings(mapped);
+        } else {
+          setFeaturedListings(mockListings.slice(0, 3));
+        }
+      } catch (error) {
         setFeaturedListings(mockListings.slice(0, 3));
       }
       setIsLoading(false);

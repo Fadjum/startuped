@@ -29,7 +29,7 @@ export async function setupVite(app: Express): Promise<ViteDevServer> {
 
   app.use(vite.middlewares);
 
-  app.use("*", async (req, res, next) => {
+  app.use(async (req, res, next) => {
     const url = req.originalUrl;
 
     try {

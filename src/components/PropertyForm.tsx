@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Phone, MapPin, DollarSign, Upload, CheckCircle, Camera, BedDouble, Bath } from 'lucide-react';
+import { Phone, MapPin, DollarSign, Upload, CheckCircle, Camera, BedDouble, Bath } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { toast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { locations } from '@/data/mockListings';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 
 const PropertyForm = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
   
   const [formData, setFormData] = useState({
     name: '',
@@ -27,37 +28,22 @@ const PropertyForm = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
 
-  // Pre-fill phone from profile if user is logged in
   useEffect(() => {
     if (user) {
-      const fetchProfile = async () => {
-        const { data } = await supabase
-          .from('profiles')
-          .select('full_name, phone')
-          .eq('user_id', user.id)
-          .maybeSingle();
-        
-        if (data) {
-          setFormData(prev => ({
-            ...prev,
-            name: data.full_name || '',
-            phone: data.phone || ''
-          }));
-        }
-      };
-      fetchProfile();
+      setFormData(prev => ({
+        ...prev,
+        name: user.fullName || '',
+        phone: user.phone || ''
+      }));
     }
   }, [user]);
 
-  // Allowed image types and max size (5MB)
   const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+  const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const newPhotos = Array.from(e.target.files);
-      
-      // Validate each file
       const validPhotos: File[] = [];
       for (const photo of newPhotos) {
         if (!ALLOWED_IMAGE_TYPES.includes(photo.type)) {
@@ -78,7 +64,6 @@ const PropertyForm = () => {
         }
         validPhotos.push(photo);
       }
-      
       setPhotos([...photos, ...validPhotos].slice(0, 5));
     }
   };
@@ -89,42 +74,11 @@ const PropertyForm = () => {
 
   const uploadImages = async (): Promise<string[]> => {
     if (photos.length === 0) return [];
-
-    // Get current session for auth token
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      toast({
-        title: "Authentication required",
-        description: "Please log in to upload images.",
-        variant: "destructive"
-      });
-      return [];
-    }
-
-    // Prepare form data with all photos
-    const formData = new FormData();
-    for (const photo of photos) {
-      formData.append('files', photo);
-    }
-
     try {
-      const response = await supabase.functions.invoke('upload-property-image', {
-        body: formData,
-      });
-
-      if (response.error) {
-        toast({
-          title: "Upload failed",
-          description: "Some images could not be uploaded. Please try again.",
-          variant: "destructive"
-        });
-        return [];
-      }
-
-      const data = response.data;
+      const data = await api.upload.uploadImages(photos);
       const uploadedUrls = data.results
-        .filter((r: { success: boolean }) => r.success)
-        .map((r: { url: string }) => r.url);
+        .filter(r => r.success)
+        .map(r => r.url as string);
 
       if (data.summary.failed > 0) {
         toast({
@@ -133,7 +87,6 @@ const PropertyForm = () => {
           variant: "destructive"
         });
       }
-
       return uploadedUrls;
     } catch (error) {
       toast({
@@ -147,7 +100,6 @@ const PropertyForm = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!formData.phone.trim() || !formData.location || !formData.price) {
       toast({
         title: "Please fill in all required fields",
@@ -158,52 +110,46 @@ const PropertyForm = () => {
 
     setIsSubmitting(true);
 
-    // If user is logged in, save to database
     if (user) {
-      const title = formData.title.trim() || `${formData.propertyType.charAt(0).toUpperCase() + formData.propertyType.slice(1)} in ${formData.location}`;
-      const featuresArray = formData.features
-        ? formData.features.split(',').map(f => f.trim()).filter(Boolean)
-        : [];
+      try {
+        const title = formData.title.trim() || `${formData.propertyType.charAt(0).toUpperCase() + formData.propertyType.slice(1)} in ${formData.location}`;
+        const featuresArray = formData.features
+          ? formData.features.split(',').map(f => f.trim()).filter(Boolean)
+          : [];
 
-      // Upload images to storage
-      const imageUrls = await uploadImages();
+        const imageUrls = await uploadImages();
 
-      const { error } = await supabase.from('properties').insert({
-        user_id: user.id,
-        title,
-        type: formData.propertyType,
-        price: parseInt(formData.price),
-        location: formData.location,
-        bedrooms: parseInt(formData.bedrooms),
-        bathrooms: parseInt(formData.bathrooms),
-        description: formData.description,
-        features: featuresArray,
-        landlord_phone: formData.phone,
-        images: imageUrls,
-        available: true
-      });
+        await api.properties.create({
+          title,
+          type: formData.propertyType,
+          price: parseInt(formData.price),
+          location: formData.location,
+          bedrooms: parseInt(formData.bedrooms),
+          bathrooms: parseInt(formData.bathrooms),
+          description: formData.description,
+          features: featuresArray,
+          landlordPhone: formData.phone,
+          images: imageUrls,
+        });
 
-      setIsSubmitting(false);
-
-      if (error) {
+        setIsSubmitting(false);
+        toast({
+          title: "Property Listed!",
+          description: "Your property is now live on UrbanNest."
+        });
+        navigate('/dashboard');
+        return;
+      } catch (error) {
+        setIsSubmitting(false);
         toast({
           title: "Failed to list property",
-          description: "Please check your details and try again.",
+          description: (error as Error).message,
           variant: "destructive"
         });
         return;
       }
-
-      toast({
-        title: "Property Listed!",
-        description: "Your property is now live on UrbanNest."
-      });
-      
-      navigate('/dashboard');
-      return;
     }
 
-    // If not logged in, send via WhatsApp (legacy flow)
     const message = encodeURIComponent(
       `New Property Listing Request:\n\n` +
       `📋 Type: ${formData.propertyType}\n` +
@@ -218,12 +164,10 @@ const PropertyForm = () => {
     );
 
     const whatsappUrl = `https://wa.me/256740166778?text=${message}`;
-
     setTimeout(() => {
       setIsSubmitting(false);
       setIsSubmitted(true);
       window.open(whatsappUrl, '_blank');
-      
       toast({
         title: "Property Submitted!",
         description: "We'll review your listing and contact you soon.",
@@ -273,7 +217,6 @@ const PropertyForm = () => {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Login prompt for guests */}
       {!user && !authLoading && (
         <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl">
           <p className="text-sm text-muted-foreground">
@@ -289,9 +232,8 @@ const PropertyForm = () => {
         </div>
       )}
 
-      {/* Property Type */}
       <div>
-        <label className="form-label">Property Type *</label>
+        <label className="form-label font-medium block mb-2">Property Type *</label>
         <div className="grid grid-cols-3 gap-3">
           {['room', 'apartment', 'house'].map((type) => (
             <button
@@ -310,68 +252,61 @@ const PropertyForm = () => {
         </div>
       </div>
 
-      {/* Title (for logged-in users) */}
       {user && (
         <div>
-          <label htmlFor="property-title" className="form-label">Property Title</label>
+          <label htmlFor="property-title" className="form-label font-medium block mb-2">Property Title</label>
           <input
             id="property-title"
             type="text"
             placeholder="e.g., Modern 2-Bedroom Apartment Near Airport"
             value={formData.title}
             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-            className="form-input"
+            className="form-input w-full px-4 py-2 border rounded-md"
           />
           <p className="text-xs text-muted-foreground mt-1">Leave blank to auto-generate</p>
         </div>
       )}
 
-      {/* Name (only for guests) */}
       {!user && (
         <div>
-          <label htmlFor="landlord-name" className="form-label">Your Name *</label>
+          <label htmlFor="landlord-name" className="form-label font-medium block mb-2">Your Name *</label>
           <div className="relative">
-            <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
             <input
               id="landlord-name"
               type="text"
               placeholder="Enter your full name"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="form-input pl-12"
+              className="form-input w-full px-4 py-2 border rounded-md"
               required
             />
           </div>
         </div>
       )}
 
-      {/* Phone */}
       <div>
-        <label htmlFor="landlord-phone" className="form-label">Phone Number *</label>
+        <label htmlFor="landlord-phone" className="form-label font-medium block mb-2">Phone Number *</label>
         <div className="relative">
-          <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
           <input
             id="landlord-phone"
             type="tel"
             placeholder="+256 700 000 000"
             value={formData.phone}
             onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-            className="form-input pl-12"
+            className="form-input w-full px-4 py-2 border rounded-md"
             required
           />
         </div>
       </div>
 
-      {/* Location */}
       <div>
-        <label htmlFor="property-location" className="form-label">Property Location *</label>
+        <label htmlFor="property-location" className="form-label font-medium block mb-2">Property Location *</label>
         <div className="relative">
-          <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
           <select
             id="property-location"
             value={formData.location}
             onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-            className="form-input pl-12 appearance-none cursor-pointer"
+            className="form-input w-full px-4 py-2 border rounded-md appearance-none cursor-pointer"
             required
           >
             <option value="">Select location</option>
@@ -382,35 +317,31 @@ const PropertyForm = () => {
         </div>
       </div>
 
-      {/* Price */}
       <div>
-        <label htmlFor="rent-price" className="form-label">Monthly Rent (UGX) *</label>
+        <label htmlFor="rent-price" className="form-label font-medium block mb-2">Monthly Rent (UGX) *</label>
         <div className="relative">
-          <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
           <input
             id="rent-price"
             type="number"
             placeholder="e.g., 500000"
             value={formData.price}
             onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-            className="form-input pl-12"
+            className="form-input w-full px-4 py-2 border rounded-md"
             required
           />
         </div>
       </div>
 
-      {/* Bedrooms & Bathrooms (for logged-in users) */}
       {user && (
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label htmlFor="bedrooms" className="form-label">Bedrooms</label>
+            <label htmlFor="bedrooms" className="form-label font-medium block mb-2">Bedrooms</label>
             <div className="relative">
-              <BedDouble className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
               <select
                 id="bedrooms"
                 value={formData.bedrooms}
                 onChange={(e) => setFormData({ ...formData, bedrooms: e.target.value })}
-                className="form-input pl-12 appearance-none cursor-pointer"
+                className="form-input w-full px-4 py-2 border rounded-md appearance-none cursor-pointer"
               >
                 {[1, 2, 3, 4, 5, 6].map(n => (
                   <option key={n} value={n}>{n}</option>
@@ -419,14 +350,13 @@ const PropertyForm = () => {
             </div>
           </div>
           <div>
-            <label htmlFor="bathrooms" className="form-label">Bathrooms</label>
+            <label htmlFor="bathrooms" className="form-label font-medium block mb-2">Bathrooms</label>
             <div className="relative">
-              <Bath className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
               <select
                 id="bathrooms"
                 value={formData.bathrooms}
                 onChange={(e) => setFormData({ ...formData, bathrooms: e.target.value })}
-                className="form-input pl-12 appearance-none cursor-pointer"
+                className="form-input w-full px-4 py-2 border rounded-md appearance-none cursor-pointer"
               >
                 {[1, 2, 3, 4].map(n => (
                   <option key={n} value={n}>{n}</option>
@@ -437,37 +367,34 @@ const PropertyForm = () => {
         </div>
       )}
 
-      {/* Description */}
       <div>
-        <label htmlFor="property-description" className="form-label">Description</label>
+        <label htmlFor="property-description" className="form-label font-medium block mb-2">Description</label>
         <textarea
           id="property-description"
           placeholder="Describe your property (features, nearby amenities...)"
           value={formData.description}
           onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-          className="form-input min-h-[120px] resize-y"
+          className="form-input w-full px-4 py-2 border rounded-md min-h-[120px] resize-y"
           rows={4}
         />
       </div>
 
-      {/* Features (for logged-in users) */}
       {user && (
         <div>
-          <label htmlFor="features" className="form-label">Features (comma separated)</label>
+          <label htmlFor="features" className="form-label font-medium block mb-2">Features (comma separated)</label>
           <input
             id="features"
             type="text"
             placeholder="e.g., Furnished, Water Tank, 24/7 Security, Parking"
             value={formData.features}
             onChange={(e) => setFormData({ ...formData, features: e.target.value })}
-            className="form-input"
+            className="form-input w-full px-4 py-2 border rounded-md"
           />
         </div>
       )}
 
-      {/* Photos */}
       <div>
-        <label className="form-label">Property Photos (Up to 5)</label>
+        <label className="form-label font-medium block mb-2">Property Photos (Up to 5)</label>
         <div className="space-y-3">
           <label className="flex items-center justify-center gap-3 py-8 px-4 rounded-xl border-2 border-dashed border-border hover:border-primary/50 cursor-pointer transition-colors bg-muted/30">
             <Camera className="w-6 h-6 text-muted-foreground" />
@@ -507,11 +434,11 @@ const PropertyForm = () => {
       <Button
         type="submit"
         disabled={isSubmitting}
-        className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold py-6 text-lg"
+        className="w-full bg-primary text-primary-foreground font-semibold py-6 text-lg rounded-md"
       >
         {isSubmitting ? (
           <>
-            <div className="w-5 h-5 border-2 border-accent-foreground/30 border-t-accent-foreground rounded-full animate-spin mr-2" />
+            <div className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin mr-2" />
             Submitting...
           </>
         ) : (
