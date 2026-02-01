@@ -82,7 +82,7 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     const distPath = path.resolve(process.cwd(), "dist/public");
     if (fs.existsSync(distPath)) {
       app.use(express.static(distPath));
-      app.get("*", (_req, res) => {
+      app.get("*all", (_req, res) => {
         res.sendFile(path.resolve(distPath, "index.html"));
       });
     }
